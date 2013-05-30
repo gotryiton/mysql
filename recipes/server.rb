@@ -170,6 +170,22 @@ execute "assign-root-password" do
 end
 
 unless platform_family?(%w{mac_os_x})
+  template "#{node['mysql']['conf_dir']}/my.cnf" do
+    source "my.cnf.erb"
+    owner "root" unless platform? 'windows'
+    group node['mysql']['root_group'] unless platform? 'windows'
+    mode "0644"
+    case node['mysql']['reload_action']
+    when 'restart'
+      notifies :restart, "service[mysql]", :immediately
+    when 'reload'
+      notifies :reload, "service[mysql]", :immediately
+    else
+      Chef::Log.info "my.cnf updated but mysql.reload_action is #{node['mysql']['reload_action']}. No action taken."
+    end
+    variables :skip_federated => skip_federated
+  end
+
   grants_path = node['mysql']['grants_path']
 
   begin
@@ -197,22 +213,6 @@ unless platform_family?(%w{mac_os_x})
       action :nothing
       subscribes :run, resources("template[#{grants_path}]"), :immediately
     end
-  end
-
-  template "#{node['mysql']['conf_dir']}/my.cnf" do
-    source "my.cnf.erb"
-    owner "root" unless platform? 'windows'
-    group node['mysql']['root_group'] unless platform? 'windows'
-    mode "0644"
-    case node['mysql']['reload_action']
-    when 'restart'
-      notifies :restart, "service[mysql]", :immediately
-    when 'reload'
-      notifies :reload, "service[mysql]", :immediately
-    else
-      Chef::Log.info "my.cnf updated but mysql.reload_action is #{node['mysql']['reload_action']}. No action taken."
-    end
-    variables :skip_federated => skip_federated
   end
 
   service "mysql" do
